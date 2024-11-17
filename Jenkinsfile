@@ -21,6 +21,21 @@ pipeline {
                     }
                 }
             }
+        stage('Trivy Terraform Scan') {
+            steps {
+                script {
+                    def trivyReport = 'trivy-main-tf-report.txt'
+                    // Run the Trivy config scan
+                    bat "trivy config --severity HIGH,CRITICAL --exit-code 1 --format table -o ${trivyReport} main.tf"
+                }
+            }
+            post {
+                always {
+                    // Archive the report for visibility
+                    archiveArtifacts artifacts: 'trivy-main-tf-report.txt', allowEmptyArchive: true
+                }
+            }
+        }
         stage('SonarCloud Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') { // The name of the SonarCloud server set up in Jenkins system config
