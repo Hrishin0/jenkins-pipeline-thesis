@@ -21,9 +21,9 @@ pipeline {
                     }
                 }
             }
-        stage('SonarQube Analysis') {
+        stage('SonarCloud Analysis') {
             steps {
-                withSonarQubeEnv('SonarCloud') { // The name of the SonarCloud server set up in Jenkins system config
+                withSonarQubeEnv('SonarQube') { // The name of the SonarCloud server set up in Jenkins system config
                     bat "${env.SONAR_SCANNER_HOME}/bin/sonar-scanner"
                 }
                 // Wait for the Quality Gate result. If qg has failed, pipeline should fail
