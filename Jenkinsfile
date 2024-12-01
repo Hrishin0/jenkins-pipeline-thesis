@@ -38,7 +38,7 @@ pipeline {
                     def trivyReport = 'trivy-docker-image-report.txt'
 
                     // Scan the Docker image
-                    bat "trivy image --severity HIGH,CRITICAL --exit-code 1 --format table -o ${trivyReport} iac-serverless-app:latest"
+                    bat "trivy image --severity HIGH,CRITICAL --exit-code 1 --format table -o ${trivyReport} iac-scanning:latest"
                 }
             }
             post {
