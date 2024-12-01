@@ -21,18 +21,30 @@ pipeline {
                     }
                 }
             }
-        stage('Trivy Terraform Scan') {
+        stage('Dockerize Application') {
             steps {
                 script {
-                    def trivyReport = 'trivy-main-tf-report.txt'
-                    // Run the Trivy config scan
-                    bat "trivy config --severity HIGH,CRITICAL --exit-code 1 --format table -o ${trivyReport} main.tf"
+                    def imageName = "iac-scanning"
+                    def imageTag = "latest"
+
+                    // Build the Docker image
+                    bat "docker build -t ${imageName}:${imageTag} ."
+                }
+            }
+        }
+        stage('Trivy Scan') {
+            steps {
+                script {
+                    def trivyReport = 'trivy-docker-image-report.txt'
+
+                    // Scan the Docker image
+                    bat "trivy image --severity HIGH,CRITICAL --exit-code 1 --format table -o ${trivyReport} iac-serverless-app:latest"
                 }
             }
             post {
                 always {
                     // Archive the report for visibility
-                    archiveArtifacts artifacts: 'trivy-main-tf-report.txt', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'trivy-docker-image-report.txt', allowEmptyArchive: true
                 }
             }
         }
