@@ -1,5 +1,6 @@
 # Base image
-FROM python:3.13-slim-bookworm
+FROM debian:bookworm-slim
+
 # Set working directory
 WORKDIR /app
 
