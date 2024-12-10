@@ -21,17 +21,17 @@ pipeline {
                     }
                 }
             }
-        // stage('Dockerize Application') {
-        //     steps {
-        //         script {
-        //             def imageName = "iac-scanning"
-        //             def imageTag = "latest"
+        stage('Dockerize Application') {
+            steps {
+                script {
+                    def imageName = "iac-scanning"
+                    def imageTag = "latest"
 
-        //             // Build the Docker image
-        //             bat "docker build -t ${imageName}:${imageTag} ."
-        //         }
-        //     }
-        // }
+                    // Build the Docker image
+                    bat "docker build -t ${imageName}:${imageTag} ."
+                }
+            }
+        }
         stage('Trivy Scan') {
             steps {
                 script {
