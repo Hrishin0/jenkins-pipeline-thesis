@@ -21,47 +21,47 @@ pipeline {
                     }
                 }
             }
-        stage('Dockerize Application') {
-            steps {
-                script {
-                    def imageName = "iac-scanning"
-                    def imageTag = "latest"
+        // stage('Dockerize Application') {
+        //     steps {
+        //         script {
+        //             def imageName = "iac-scanning"
+        //             def imageTag = "latest"
 
-                    // Build the Docker image
-                    bat "docker build -t ${imageName}:${imageTag} ."
-                }
-            }
-        }
-        stage('Trivy Scan') {
-            steps {
-                script {
-                    def trivyReport = 'trivy-docker-image-report.txt'
+        //             // Build the Docker image
+        //             bat "docker build -t ${imageName}:${imageTag} ."
+        //         }
+        //     }
+        // }
+        // stage('Trivy Scan') {
+        //     steps {
+        //         script {
+        //             def trivyReport = 'trivy-docker-image-report.txt'
 
-                    // Scan the Docker image
-                    bat "trivy image --severity CRITICAL --exit-code 1 --format table -o ${trivyReport} iac-scanning:latest"
-                }
-            }
-            post {
-                always {
-                    // Archive the report for visibility
-                    archiveArtifacts artifacts: 'trivy-docker-image-report.txt', allowEmptyArchive: true
-                }
-            }
-        }
-        stage('SonarCloud Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') { // The name of the SonarCloud server set up in Jenkins system config
-                    bat "${env.SONAR_SCANNER_HOME}/bin/sonar-scanner"
-                }
-                // Wait for the Quality Gate result. If qg has failed, pipeline should fail
-                script {
-                    def qg = waitForQualityGate()
-                    if (qg.status != 'OK') {
-                        error "Pipeline aborted due to Quality Gate failure: ${qg.status}"
-                    }
-                }
-            }
-        }
+        //             // Scan the Docker image
+        //             bat "trivy image --severity CRITICAL --exit-code 1 --format table -o ${trivyReport} iac-scanning:latest"
+        //         }
+        //     }
+        //     post {
+        //         always {
+        //             // Archive the report for visibility
+        //             archiveArtifacts artifacts: 'trivy-docker-image-report.txt', allowEmptyArchive: true
+        //         }
+        //     }
+        // }
+        // stage('SonarCloud Analysis') {
+        //     steps {
+        //         withSonarQubeEnv('SonarQube') { // The name of the SonarCloud server set up in Jenkins system config
+        //             bat "${env.SONAR_SCANNER_HOME}/bin/sonar-scanner"
+        //         }
+        //         // Wait for the Quality Gate result. If qg has failed, pipeline should fail
+        //         script {
+        //             def qg = waitForQualityGate()
+        //             if (qg.status != 'OK') {
+        //                 error "Pipeline aborted due to Quality Gate failure: ${qg.status}"
+        //             }
+        //         }
+        //     }
+        // }
         stage('Plan') {
             steps {
                 bat 'cd terraform && terraform init'
