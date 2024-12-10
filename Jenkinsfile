@@ -48,20 +48,20 @@ pipeline {
                 }
             }
         }
-        // stage('SonarCloud Analysis') {
-        //     steps {
-        //         withSonarQubeEnv('SonarQube') { // The name of the SonarCloud server set up in Jenkins system config
-        //             bat "${env.SONAR_SCANNER_HOME}/bin/sonar-scanner"
-        //         }
-        //         // Wait for the Quality Gate result. If qg has failed, pipeline should fail
-        //         script {
-        //             def qg = waitForQualityGate()
-        //             if (qg.status != 'OK') {
-        //                 error "Pipeline aborted due to Quality Gate failure: ${qg.status}"
-        //             }
-        //         }
-        //     }
-        // }
+        stage('SonarCloud Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') { // The name of the SonarCloud server set up in Jenkins system config
+                    bat "${env.SONAR_SCANNER_HOME}/bin/sonar-scanner"
+                }
+                // Wait for the Quality Gate result. If qg has failed, pipeline should fail
+                script {
+                    def qg = waitForQualityGate()
+                    if (qg.status != 'OK') {
+                        error "Pipeline aborted due to Quality Gate failure: ${qg.status}"
+                    }
+                }
+            }
+        }
         stage('Plan') {
             steps {
                 bat 'cd terraform && terraform init'
