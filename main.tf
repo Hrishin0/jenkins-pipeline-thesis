@@ -77,24 +77,41 @@ resource "aws_iam_role" "lambda_role" {
     EOF
 }
 
+# IAM Policy for Lambda Role
 resource "aws_iam_role_policy" "lambda_policy" {
-  name = "lambda_dynamodb_policy"
+  name = "lambda_dynamodb_and_logs_policy"
   role = aws_iam_role.lambda_role.id
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
+      # DynamoDB permissions
       {
         Action = [
+          "dynamodb:GetItem",
           "dynamodb:PutItem",
-          "dynamodb:Scan"
+          "dynamodb:Scan",
+          "dynamodb:UpdateItem"
         ],
         Effect   = "Allow",
         Resource = aws_dynamodb_table.todo_table.arn
       },
+      
+      # CloudWatch Logs permissions
       {
-        Action   = "logs:*",
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
         Effect   = "Allow",
-        Resource = "arn:aws:logs:*:*:*"
+        Resource = "arn:aws:logs:${var.myregion}:${var.accountId}:log-group:/aws/lambda/*"
+      },
+
+      # Lambda invocation permissions (for other Lambda functions if needed)
+      {
+        Action   = "lambda:InvokeFunction",
+        Effect   = "Allow",
+        Resource = "arn:aws:lambda:${var.myregion}:${var.accountId}:function:*"
       }
     ]
   })
@@ -126,55 +143,6 @@ resource "aws_api_gateway_method" "post_student_method" {
   authorization = "NONE"
 }
 
-#FOR CORS BECAUSE ITS ANNOYING
-resource "aws_api_gateway_method" "cors_options" {
-    rest_api_id = aws_api_gateway_rest_api.student_api.id
-    resource_id = aws_api_gateway_resource.student_resource.id
-    http_method = "OPTIONS"
-    authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "cors_integration" {
-  rest_api_id = aws_api_gateway_rest_api.student_api.id
-  resource_id = aws_api_gateway_resource.student_resource.id
-  http_method = aws_api_gateway_method.cors_options.http_method
-  type        = "MOCK"
-
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-resource "aws_api_gateway_integration_response" "cors_integration_response" {
-  rest_api_id = aws_api_gateway_rest_api.student_api.id
-  resource_id = aws_api_gateway_resource.student_resource.id
-  http_method = aws_api_gateway_method.cors_options.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-  }
-}
-
-resource "aws_api_gateway_method_response" "cors_method_response" {
-  rest_api_id = aws_api_gateway_rest_api.student_api.id
-  resource_id = aws_api_gateway_resource.student_resource.id
-  http_method = aws_api_gateway_method.cors_options.http_method
-  status_code = "200"
-
-  response_models = {
-    "application/json" = "Empty"
-  }
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-}
-
-
 
 #No more CORS
 
@@ -204,6 +172,12 @@ resource "aws_lambda_permission" "apigw_lambdaget" {
   function_name = aws_lambda_function.lambda_func_1.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "arn:aws:execute-api:${var.myregion}:${var.accountId}:${aws_api_gateway_rest_api.student_api.id}/*/${aws_api_gateway_method.get_student_method.http_method}${aws_api_gateway_resource.student_resource.path}"
+
+  depends_on = [
+    aws_api_gateway_rest_api.student_api,
+    aws_api_gateway_method.get_student_method
+  ]  
+
 }
 
 
@@ -213,6 +187,10 @@ resource "aws_lambda_permission" "apigw_lambdapost" {
   function_name = aws_lambda_function.lambda_func_2.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "arn:aws:execute-api:${var.myregion}:${var.accountId}:${aws_api_gateway_rest_api.student_api.id}/*/${aws_api_gateway_method.post_student_method.http_method}${aws_api_gateway_resource.student_resource.path}"
+  depends_on = [
+    aws_api_gateway_rest_api.student_api,
+    aws_api_gateway_method.post_student_method
+  ] 
 }
 
 resource "aws_api_gateway_deployment" "deploy" {
@@ -224,8 +202,10 @@ resource "aws_api_gateway_deployment" "deploy" {
   lifecycle {
     create_before_destroy = true
   }
-  depends_on = [aws_api_gateway_method.get_student_method, aws_api_gateway_method.post_student_method, aws_api_gateway_integration.getIntegration, aws_api_gateway_integration.postIntegration, aws_api_gateway_integration.cors_integration]
+  depends_on = [aws_api_gateway_method.get_student_method, aws_api_gateway_method.post_student_method, aws_api_gateway_integration.getIntegration, aws_api_gateway_integration.postIntegration]
 }
+
+
 
 resource "aws_api_gateway_stage" "prod" {
   deployment_id = aws_api_gateway_deployment.deploy.id
@@ -234,11 +214,27 @@ resource "aws_api_gateway_stage" "prod" {
 }
 
 
+module "api_gateway_enable_cors" {
+  source  = "squidfunk/api-gateway-enable-cors/aws"
+  version = "0.3.3"
+
+  api_id = aws_api_gateway_rest_api.student_api.id
+  api_resource_id = aws_api_gateway_resource.student_resource.id
+}
+
+
 # S3 Bucket for Frontend Hosting
 resource "aws_s3_bucket" "frontend_bucket" {
   bucket = "hrishin-test-111"
   website {
     index_document = "index.html"
+  }
+   cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["GET", "POST"]
+    allowed_origins = ["*"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3000
   }
 }
 
@@ -249,13 +245,36 @@ resource "aws_s3_bucket_object" "index_html" {
   source       = "index.html"
   content_type = "text/html"
 }
+resource "aws_s3_bucket_public_access_block" "frontend_bucket_public_access" {
+  bucket = aws_s3_bucket.frontend_bucket.id
 
-# Upload scripts.js file to S3
-resource "aws_s3_bucket_object" "scripts_js" {
-  bucket       = aws_s3_bucket.frontend_bucket.bucket
-  key          = "scripts.js"
-  source       = "scripts.js"
-  content_type = "application/javascript"
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+# Bucket Policy
+resource "aws_s3_bucket_policy" "frontend_bucket_policy" {
+  bucket = aws_s3_bucket.frontend_bucket.id
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid       = "Stmt1733764956969",
+        Effect    = "Allow",
+        Principal = "*",
+        Action    = [
+          "s3:GetObject"
+        ],
+        Resource  = "arn:aws:s3:::hrishin-test-111/*"
+      }
+    ]
+  })
+  depends_on = [
+    aws_s3_bucket_public_access_block.frontend_bucket_public_access
+  ]
 }
 
 output "frontend_url" {
