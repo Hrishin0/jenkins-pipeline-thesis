@@ -236,6 +236,14 @@ resource "aws_s3_bucket" "frontend_bucket" {
     expose_headers  = ["ETag"]
     max_age_seconds = 3000
   }
+    # Enable server-side encryption with AES256
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
 }
 
 # Upload index.html file to S3
